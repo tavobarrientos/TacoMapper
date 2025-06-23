@@ -7,8 +7,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="../lib/TacoMapper.csproj" />
+    <PackageReference Include="TacoMapper" Version="1.0.0-pre5-20250623214635" />
   </ItemGroup>
 
 </Project>
