@@ -7,6 +7,12 @@ on:
     branches: [ main ]
     types: [ closed ]
 
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+  issues: write
+
 # Only run on merged PRs or direct pushes to main
 jobs:
   check-pr-merged:

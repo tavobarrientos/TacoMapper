@@ -23,6 +23,12 @@ on:
         description: 'Minimum code coverage threshold'
         required: false
 
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+  issues: write
+
 env:
   DOTNET_VERSION: '8.0.x'
   SOLUTION_PATH: './TacoMapper.sln'

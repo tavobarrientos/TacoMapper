@@ -18,6 +18,12 @@ on:
         default: '30'
         type: string
 
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+  issues: write
+
 jobs:
   generate-version:
     runs-on: ubuntu-latest
@@ -160,9 +166,10 @@ jobs:
             ## 📊 Quality Metrics
             - ✅ All tests passing
             - 📈 Code coverage ≥ 70%
-            - 🔍 Static analysis passed
+            - 🔍 Static analysis passed            
             - 🏗️ Built with .NET 8.0
-              ## 📦 Installation
+            
+            ## 📦 Installation
             
             ### NuGet Package Manager
             ```bash
@@ -202,7 +209,8 @@ jobs:
             - [GitHub Repository](https://github.com/${{ github.repository }})
             - [NuGet Package](https://www.nuget.org/packages/TacoMapper/${{ needs.generate-version.outputs.version }})
             
-            ## 🤝 Contributing
+            ## 🤝 Contributing            
             We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-              ---
+            
+            ---
             **Happy Mapping!** 🌮✨
