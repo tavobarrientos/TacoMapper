@@ -1,0 +1,32 @@
+name: CI - Prerelease Deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
+
+# Only run on merged PRs or direct pushes to main
+jobs:
+  check-pr-merged:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR Merged Check
+        run: |
+          echo "✅ Building and deploying prerelease package"
+          echo "Event: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR #${{ github.event.pull_request.number }} was merged"
+          fi
+
+  deploy-prerelease:
+    needs: check-pr-merged
+    uses: ./.github/workflows/base-build-and-test.yml
+    with:
+      is-prerelease: true
+      should-publish: true
+    secrets:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      COVERAGE_THRESHOLD: ${{ secrets.COVERAGE_THRESHOLD }}

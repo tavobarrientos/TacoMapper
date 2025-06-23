@@ -1,0 +1,201 @@
+name: Base Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      is-prerelease:
+        description: 'Whether this is a prerelease build'
+        required: true
+        type: boolean
+      should-publish:
+        description: 'Whether to publish the package'
+        required: true
+        type: boolean
+      version:
+        description: 'Package version to use'
+        required: false
+        type: string
+    secrets:
+      NUGET_API_KEY:
+        description: 'NuGet API key for publishing'
+        required: true
+      COVERAGE_THRESHOLD:
+        description: 'Minimum code coverage threshold'
+        required: false
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_PATH: './TacoMapper.sln'
+  PROJECT_PATH: './lib/TacoMapper.csproj'
+  TEST_PATH: './unit-tests/TacoMapper.Tests.csproj'
+  COVERAGE_THRESHOLD: ${{ secrets.COVERAGE_THRESHOLD || '70' }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+
+    - name: Install coverage tools
+      run: |
+        dotnet tool install --global coverlet.console
+        dotnet tool install --global dotnet-reportgenerator-globaltool
+
+    - name: Run tests with coverage
+      run: |
+        dotnet test ${{ env.TEST_PATH }} \
+          --configuration Release \
+          --no-build \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./coverage \
+          --logger trx \
+          --verbosity normal
+
+    - name: Generate coverage report
+      run: |
+        reportgenerator \
+          -reports:"./coverage/**/coverage.cobertura.xml" \
+          -targetdir:"./coverage/report" \
+          -reporttypes:"Html;Cobertura;TextSummary"
+
+    - name: Check coverage threshold
+      run: |
+        COVERAGE=$(grep -oP 'Line coverage: \K[0-9.]+' ./coverage/report/Summary.txt | head -1)
+        echo "Current coverage: ${COVERAGE}%"
+        echo "Required threshold: ${{ env.COVERAGE_THRESHOLD }}%"
+        
+        if (( $(echo "$COVERAGE < ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+          echo "❌ Coverage ${COVERAGE}% is below threshold ${{ env.COVERAGE_THRESHOLD }}%"
+          exit 1
+        else
+          echo "✅ Coverage ${COVERAGE}% meets threshold ${{ env.COVERAGE_THRESHOLD }}%"
+        fi
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: ./coverage/report/
+
+    - name: Set version for prerelease
+      if: inputs.is-prerelease
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          # Use provided version for prerelease
+          VERSION="${{ inputs.version }}-pre${{ github.run_number }}"
+        else
+          # Generate version with timestamp for prerelease
+          TIMESTAMP=$(date -u +"%Y%m%d%H%M%S")
+          VERSION="1.0.0-pre${{ github.run_number }}-${TIMESTAMP}"
+        fi
+        echo "PACKAGE_VERSION=${VERSION}" >> $GITHUB_ENV
+        echo "Generated prerelease version: ${VERSION}"
+
+    - name: Set version for release
+      if: ${{ !inputs.is-prerelease }}
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          # Use provided version for release
+          VERSION="${{ inputs.version }}"
+        else
+          # For release, use semantic versioning based on build number
+          VERSION="1.0.${{ github.run_number }}"
+        fi
+        echo "PACKAGE_VERSION=${VERSION}" >> $GITHUB_ENV
+        echo "Generated release version: ${VERSION}"
+
+    - name: Update project version
+      run: |
+        # Update the version in the project file
+        sed -i "s/<Version>.*<\/Version>/<Version>${PACKAGE_VERSION}<\/Version>/" ${{ env.PROJECT_PATH }}
+        echo "Updated project version to: ${PACKAGE_VERSION}"
+
+    - name: Build NuGet package
+      run: |
+        dotnet pack ${{ env.PROJECT_PATH }} \
+          --configuration Release \
+          --no-build \
+          --output ./artifacts \
+          -p:PackageVersion=${{ env.PACKAGE_VERSION }}
+
+    - name: Upload NuGet package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-package
+        path: ./artifacts/*.nupkg
+
+    - name: Publish to NuGet
+      if: inputs.should-publish
+      run: |
+        dotnet nuget push ./artifacts/*.nupkg \
+          --api-key ${{ secrets.NUGET_API_KEY }} \
+          --source https://api.nuget.org/v3/index.json \
+          --skip-duplicate    # Only create GitHub release if no custom version is provided (CI scenario)
+    # For manual releases, the calling workflow handles release creation
+    - name: Create GitHub Release
+      if: inputs.should-publish && !inputs.is-prerelease && inputs.version == ''
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ env.PACKAGE_VERSION }}
+        name: Release v${{ env.PACKAGE_VERSION }}
+        body: |
+          ## TacoMapper v${{ env.PACKAGE_VERSION }}
+          
+          🌮 **New Release of TacoMapper!**
+          
+          ### What's Changed
+          - Automatic release from CI/CD pipeline
+          - All tests passing with ≥${{ env.COVERAGE_THRESHOLD }}% code coverage
+          
+          ### Package Information
+          - **NuGet Package**: [TacoMapper v${{ env.PACKAGE_VERSION }}](https://www.nuget.org/packages/TacoMapper/${{ env.PACKAGE_VERSION }})
+          - **Target Framework**: .NET 8.0
+          
+          ### Installation          ```bash
+          dotnet add package TacoMapper --version ${{ env.PACKAGE_VERSION }}
+          ```
+          
+          Happy mapping! 🌮✨
+
+    - name: Comment on PR (if applicable)
+      if: inputs.is-prerelease && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/core');
+          const message = `
+          🌮 **TacoMapper Prerelease Package Created!**
+          
+          📦 **Package Version**: \`${{ env.PACKAGE_VERSION }}\`
+          ✅ **Tests**: All passed
+          📊 **Coverage**: ≥${{ env.COVERAGE_THRESHOLD }}%
+          
+          You can test this prerelease version:
+          \`\`\`bash
+          dotnet add package TacoMapper --version ${{ env.PACKAGE_VERSION }} --prerelease
+          \`\`\`
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: message
+          });
