@@ -142,7 +142,6 @@ jobs:
     secrets:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       COVERAGE_THRESHOLD: ${{ secrets.COVERAGE_THRESHOLD }}
-
   create-enhanced-release:
     needs: [generate-version, deploy-release-with-version]
     if: success()
@@ -151,6 +150,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Download NuGet package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-package
+          path: ./downloaded-artifacts
+
       - name: Create Enhanced GitHub Release
         uses: softprops/action-gh-release@v1
         env:
@@ -158,6 +163,8 @@ jobs:
         with:
           tag_name: v${{ needs.generate-version.outputs.version }}
           name: TacoMapper v${{ needs.generate-version.outputs.version }}
+          files: |
+            ./downloaded-artifacts/*.nupkg
           body: |
             # 🌮 TacoMapper v${{ needs.generate-version.outputs.version }}
             
@@ -168,8 +175,12 @@ jobs:
             - 📈 Code coverage ≥ 70%
             - 🔍 Static analysis passed            
             - 🏗️ Built with .NET 8.0
-            
+              
             ## 📦 Installation
+            
+            ### 📦 Direct Download
+            You can download the NuGet package directly from this release:
+            - [TacoMapper.v${{ needs.generate-version.outputs.version }}.nupkg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.generate-version.outputs.version }}/TacoMapper.${{ needs.generate-version.outputs.version }}.nupkg)
             
             ### NuGet Package Manager
             ```bash

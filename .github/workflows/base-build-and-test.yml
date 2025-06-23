@@ -121,7 +121,7 @@ jobs:
         else
           # For release, use semantic versioning based on build number
           VERSION="1.0.${{ github.run_number }}"
-        fi
+        fi        
         echo "PACKAGE_VERSION=${VERSION}" >> $GITHUB_ENV
         echo "Generated release version: ${VERSION}"
 
@@ -151,7 +151,15 @@ jobs:
         dotnet nuget push ./artifacts/*.nupkg \
           --api-key ${{ secrets.NUGET_API_KEY }} \
           --source https://api.nuget.org/v3/index.json \
-          --skip-duplicate    # Only create GitHub release if no custom version is provided (CI scenario)
+          --skip-duplicate
+
+    - name: Publish to GitHub Packages
+      if: inputs.should-publish
+      run: |
+        dotnet nuget push ./artifacts/*.nupkg \
+          --api-key ${{ secrets.GITHUB_TOKEN }} \
+          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json \
+          --skip-duplicate
     # For manual releases, the calling workflow handles release creation
     - name: Create GitHub Release
       if: inputs.should-publish && !inputs.is-prerelease && inputs.version == ''
