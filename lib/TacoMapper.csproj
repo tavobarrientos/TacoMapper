@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>TacoMapper</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Your Name</Authors>
+    <Description>A lightweight object mapper with fluent API supporting basic, conditional, and combine mapping</Description>
+    <PackageTags>mapper;object-mapper;fluent-api;lightweight;taco</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Program.cs" />
+    <Compile Remove="MapperTests.cs" />
+    <Compile Remove="TestModels.cs" />
+  </ItemGroup>
+
+</Project>
