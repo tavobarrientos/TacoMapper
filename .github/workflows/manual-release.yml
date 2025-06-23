@@ -1,0 +1,208 @@
+name: Manual Release Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version increment type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      include_commits_since:
+        description: 'Include commits since last release (days ago)'
+        required: false
+        default: '30'
+        type: string
+
+jobs:
+  generate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_notes: ${{ steps.version.outputs.release_notes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version and release notes
+        id: version
+        run: |
+          # Fetch all tags and commits
+          git fetch --tags --unshallow || git fetch --tags
+          
+          # Get the latest tag (if any)
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          
+          # Remove 'v' prefix if present
+          LATEST_VERSION=${LATEST_TAG#v}
+          echo "Latest version: $LATEST_VERSION"
+          
+          # Parse version components
+          IFS='.' read -ra VERSION_PARTS <<< "$LATEST_VERSION"
+          MAJOR=${VERSION_PARTS[0]:-0}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          echo "Current version components: $MAJOR.$MINOR.$PATCH"
+          
+          # Increment version based on input
+          case "${{ github.event.inputs.version_type }}" in
+            "major")
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            "minor")
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            "patch")
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Generate release notes from commits
+          DAYS_BACK="${{ github.event.inputs.include_commits_since }}"
+          SINCE_DATE=$(date -d "$DAYS_BACK days ago" +%Y-%m-%d)
+          
+          echo "Generating release notes for commits since: $SINCE_DATE"
+          
+          # Get commits since the last tag or since specified days
+          if [ "$LATEST_TAG" != "v0.0.0" ]; then
+            COMMIT_RANGE="$LATEST_TAG..HEAD"
+            echo "Using commit range: $COMMIT_RANGE"
+          else
+            COMMIT_RANGE="--since=$SINCE_DATE"
+            echo "Using date range: $COMMIT_RANGE"
+          fi
+          
+          # Generate commit log
+          COMMITS=$(git log $COMMIT_RANGE --pretty=format:"- %s (%h)" --reverse)
+          
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- No new commits since last release"
+          fi
+          
+          # Create release notes
+          RELEASE_NOTES=$(cat << EOF
+          ## 🚀 What's New in v$NEW_VERSION
+          
+          This release includes the following changes:
+          
+          ### 📝 Commits
+          $COMMITS
+          
+          ### 📊 Repository Stats
+          - **Release Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          - **Version Type**: ${{ github.event.inputs.version_type }} release
+          - **Commits Included**: $(echo "$COMMITS" | wc -l) commits
+          - **Previous Version**: $LATEST_VERSION
+          EOF
+          )
+          
+          # Save release notes to output
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Also create a summary for the workflow
+          echo "## 🌮 TacoMapper Release v$NEW_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version Type**: ${{ github.event.inputs.version_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Version**: $LATEST_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**New Version**: $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Recent Changes:" >> $GITHUB_STEP_SUMMARY
+          echo "$COMMITS" >> $GITHUB_STEP_SUMMARY
+
+  deploy-release-with-version:
+    needs: generate-version
+    uses: ./.github/workflows/base-build-and-test.yml
+    with:
+      is-prerelease: false
+      should-publish: true
+      version: ${{ needs.generate-version.outputs.version }}
+    secrets:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      COVERAGE_THRESHOLD: ${{ secrets.COVERAGE_THRESHOLD }}
+
+  create-enhanced-release:
+    needs: [generate-version, deploy-release-with-version]
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Enhanced GitHub Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.generate-version.outputs.version }}
+          name: TacoMapper v${{ needs.generate-version.outputs.version }}
+          body: |
+            # 🌮 TacoMapper v${{ needs.generate-version.outputs.version }}
+            
+            ${{ needs.generate-version.outputs.release_notes }}
+            
+            ## 📊 Quality Metrics
+            - ✅ All tests passing
+            - 📈 Code coverage ≥ 70%
+            - 🔍 Static analysis passed
+            - 🏗️ Built with .NET 8.0
+              ## 📦 Installation
+            
+            ### NuGet Package Manager
+            ```bash
+            dotnet add package TacoMapper --version ${{ needs.generate-version.outputs.version }}
+            ```
+            
+            ### Package Manager Console (Visual Studio)
+            ```powershell
+            Install-Package TacoMapper -Version ${{ needs.generate-version.outputs.version }}
+            ```
+            
+            ### PackageReference (in .csproj)
+            ```xml
+            <PackageReference Include="TacoMapper" Version="${{ needs.generate-version.outputs.version }}" />
+            ```
+            
+            ## 🌮 Quick Start
+            
+            ```csharp
+            using TacoMapper;
+            
+            var mapper = new ObjectMapper();
+            
+            // Basic mapping
+            var result = mapper.Map<Source, Target>(source)
+                .To(target => target.Name, source => source.FullName)
+                .Execute();
+            
+            // Conditional mapping
+            var result = mapper.Map<Source, Target>(source)
+                .To(target => target.Status, source => source.IsActive ? "Active" : "Inactive")
+                .When(source => source.IsValid)
+                .Execute();
+            ```
+            
+            ## 📚 Documentation
+            - [GitHub Repository](https://github.com/${{ github.repository }})
+            - [NuGet Package](https://www.nuget.org/packages/TacoMapper/${{ needs.generate-version.outputs.version }})
+            
+            ## 🤝 Contributing
+            We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+              ---
+            **Happy Mapping!** 🌮✨

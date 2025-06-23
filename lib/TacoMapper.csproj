@@ -1,5 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
+<Project Sdk="Microsoft.NET.Sdk">  <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
@@ -7,15 +6,26 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>TacoMapper</PackageId>
     <Version>1.0.0</Version>
-    <Authors>Your Name</Authors>
+    <Authors>Gustavo Barrientos</Authors>
+    <Company>TacoMapper</Company>
+    <Product>TacoMapper</Product>
     <Description>A lightweight object mapper with fluent API supporting basic, conditional, and combine mapping</Description>
-    <PackageTags>mapper;object-mapper;fluent-api;lightweight;taco</PackageTags>
+    <PackageTags>tacomapper;object-mapper;fluent-api;lightweight;taco;mapping;dotnet</PackageTags>
+    <PackageProjectUrl>https://github.com/tavobarrientos/TacoMapper</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/tavobarrientos/TacoMapper</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>See https://github.com/tavobarrientos/TacoMapper/releases for release notes</PackageReleaseNotes>
+    <Copyright>Copyright © $(Authors) $([System.DateTime]::Now.Year)</Copyright>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Program.cs" />
-    <Compile Remove="MapperTests.cs" />
-    <Compile Remove="TestModels.cs" />
+    <None Include="../README.md" Pack="true" PackagePath="\" Condition="Exists('../README.md')" />
+    <None Include="../icon.png" Pack="true" PackagePath="\" Condition="Exists('../icon.png')" />
   </ItemGroup>
-
 </Project>
