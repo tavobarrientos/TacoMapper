@@ -1,0 +1,403 @@
+---
+title: Contributing to TacoMapper
+description: Learn how to contribute to the TacoMapper project, including development setup, coding standards, and submission guidelines.
+---
+
+## Welcome Contributors! 🌮
+
+We're excited that you're interested in contributing to TacoMapper! This guide will help you get started with contributing to the project, whether you're fixing bugs, adding features, improving documentation, or helping with testing.
+
+## Ways to Contribute
+
+### 🐛 **Bug Reports**
+
+- Report bugs through GitHub Issues
+- Include detailed reproduction steps
+- Provide example code that demonstrates the issue
+- Specify your environment (.NET version, OS, etc.)
+
+### ✨ **Feature Requests**
+
+- Suggest new mapping capabilities
+- Propose API improvements
+- Request performance optimizations
+- Share use cases that aren't well supported
+
+### 📝 **Documentation**
+
+- Improve existing documentation
+- Add more examples and use cases
+- Fix typos and clarify explanations
+- Translate documentation (future)
+
+### 🧪 **Testing**
+
+- Add unit tests for existing features
+- Improve test coverage
+- Add integration tests
+- Performance benchmarking
+
+### 💻 **Code Contributions**
+
+- Bug fixes
+- New features
+- Performance improvements
+- Code quality enhancements
+
+## Development Setup
+
+### Prerequisites
+
+- **.NET 8.0 SDK** or later
+- **Git** for version control
+- **Visual Studio 2022**, **JetBrains Rider**, or **VS Code** with C# extension
+- **GitHub account** for submitting pull requests
+
+### Getting Started
+
+1. **Fork the Repository**
+
+   ```bash
+   # Navigate to https://github.com/tavobarrientos/TacoMapper
+   # Click the "Fork" button in the top right
+   ```
+
+2. **Clone Your Fork**
+
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/TacoMapper.git
+   cd TacoMapper
+   ```
+
+3. **Add Upstream Remote**
+
+   ```bash
+   git remote add upstream https://github.com/tavobarrientos/TacoMapper.git
+   ```
+
+4. **Build the Project**
+
+   ```bash
+   dotnet build
+   ```
+
+5. **Run Tests**
+
+   ```bash
+   dotnet test
+   ```
+
+6. **Run the Example**
+
+   ```bash
+   cd example
+   dotnet run
+   ```
+
+## Project Structure
+
+```text
+TacoMapper/
+├── lib/                          # Main library code
+│   ├── core/
+│   │   ├── IMapper.cs           # Mapper interface
+│   │   ├── Mapper.cs            # Mapper implementation
+│   │   └── ObjectMapper.cs      # Static entry point
+│   └── TacoMapper.csproj        # Library project file
+├── example/                      # Example usage
+│   ├── Program.cs               # Demo application
+│   ├── Models/
+│   │   └── Models.cs            # Sample models
+│   └── TacoMapper.Example.csproj
+├── unit-tests/                   # Unit tests
+│   ├── Mapper.Tests.cs          # Main test file
+│   ├── TestModels.cs            # Test models
+│   └── TacoMapper.Tests.csproj
+├── page/                         # Documentation site
+│   └── src/content/docs/         # Documentation content
+├── .github/workflows/            # CI/CD workflows
+└── README.md                     # Project README
+```
+
+## Coding Standards
+
+### C# Conventions
+
+**Follow Microsoft's C# Coding Conventions:**
+
+```csharp
+// ✅ Good: PascalCase for public members
+public class ObjectMapper
+{
+    public static IMapper<TSource, TDestination> Create<TSource, TDestination>()
+    {
+        // ✅ Good: camelCase for local variables
+        var mapper = new Mapper<TSource, TDestination>();
+        return mapper;
+    }
+}
+
+// ✅ Good: Use meaningful names
+public IMapper<TSource, TDestination> Map<TProp>(
+    Expression<Func<TDestination, TProp>> destinationProperty,
+    Expression<Func<TSource, TProp>> sourceProperty)
+
+// ❌ Bad: Generic or unclear names
+public IMapper<TSource, TDestination> Map<T>(
+    Expression<Func<TDestination, T>> dest,
+    Expression<Func<TSource, T>> src)
+```
+
+### Documentation Standards
+
+**XML Documentation for Public APIs:**
+
+```csharp
+/// <summary>
+/// Maps a source property to a destination property with a custom transformation
+/// </summary>
+/// <typeparam name="TSrcProp">Source property type</typeparam>
+/// <typeparam name="TDestProp">Destination property type</typeparam>
+/// <param name="destinationProperty">Expression selecting the destination property</param>
+/// <param name="sourceProperty">Expression selecting the source property</param>
+/// <param name="transform">Function to transform the source value</param>
+/// <returns>The mapper instance for method chaining</returns>
+public IMapper<TSource, TDestination> Map<TSrcProp, TDestProp>(
+    Expression<Func<TDestination, TDestProp>> destinationProperty,
+    Expression<Func<TSource, TSrcProp>> sourceProperty,
+    Func<TSrcProp, TDestProp> transform)
+```
+
+### Performance Guidelines
+
+1. **Avoid Boxing/Unboxing** - Use generics appropriately
+2. **Minimize Allocations** - Reuse objects where possible
+3. **Cache Compiled Expressions** - Store compiled delegates
+4. **Lazy Initialization** - Initialize expensive resources only when needed
+
+```csharp
+// ✅ Good: Lazy compilation
+private readonly Lazy<Func<TSource, TDestination>> _compiledMapper;
+
+// ✅ Good: Minimal allocations
+public List<TDestination> MapFrom(IEnumerable<TSource> sources)
+{
+    var result = new List<TDestination>();
+    foreach (var source in sources)
+    {
+        result.Add(MapFrom(source));
+    }
+    return result;
+}
+```
+
+## Testing Guidelines
+
+### Unit Test Structure
+
+**Use AAA Pattern (Arrange, Act, Assert):**
+
+```csharp
+[Test]
+public void Map_WithCustomTransformation_TransformsValueCorrectly()
+{
+    // Arrange
+    var person = new Person 
+    { 
+        DateOfBirth = new DateTime(1990, 1, 1) 
+    };
+    
+    var mapper = ObjectMapper.Create<Person, PersonDto>()
+        .Map(dest => dest.Age, src => src.DateOfBirth, 
+             dob => DateTime.Now.Year - dob.Year);
+    
+    // Act
+    var result = mapper.MapFrom(person);
+    
+    // Assert
+    Assert.That(result.Age, Is.EqualTo(DateTime.Now.Year - 1990));
+}
+```
+
+### Test Coverage Requirements
+
+- **New Features**: Minimum 90% code coverage
+- **Bug Fixes**: Include regression tests
+- **Edge Cases**: Test null values, empty collections, edge conditions
+- **Performance**: Include benchmarks for performance-critical code
+
+### Test Categories
+
+```csharp
+[Test]
+[Category("Unit")]
+public void BasicMapping_Works() { /* ... */ }
+
+[Test]
+[Category("Integration")]
+public void ComplexScenario_Works() { /* ... */ }
+
+[Test]
+[Category("Performance")]
+public void LargeCollection_PerformsWell() { /* ... */ }
+```
+
+## Submission Process
+
+### 1. Create a Feature Branch
+
+```bash
+# Stay up to date
+git checkout main
+git pull upstream main
+
+# Create feature branch
+git checkout -b feature/your-feature-name
+# or
+git checkout -b fix/issue-number-description
+```
+
+### 2. Make Your Changes
+
+- Write code following the coding standards
+- Add comprehensive tests
+- Update documentation if needed
+- Run tests locally
+
+```bash
+# Build and test
+dotnet build
+dotnet test
+
+# Check formatting (if using EditorConfig)
+dotnet format --verify-no-changes
+```
+
+### 3. Commit Your Changes
+
+**Use Conventional Commits:**
+
+```bash
+# Feature commits
+git commit -m "feat: add conditional mapping with custom predicates"
+
+# Bug fix commits
+git commit -m "fix: resolve null reference exception in collection mapping"
+
+# Documentation commits
+git commit -m "docs: add advanced mapping examples"
+
+# Test commits
+git commit -m "test: add unit tests for property combination"
+```
+
+### 4. Submit Pull Request
+
+```bash
+# Push to your fork
+git push origin feature/your-feature-name
+
+# Create PR on GitHub
+# Navigate to https://github.com/tavobarrientos/TacoMapper
+# Click "New Pull Request"
+```
+
+## Pull Request Guidelines
+
+### PR Title Format
+
+- `feat: Brief description of new feature`
+- `fix: Brief description of bug fix`
+- `docs: Brief description of documentation change`
+- `test: Brief description of test changes`
+- `refactor: Brief description of refactoring`
+- `perf: Brief description of performance improvement`
+
+### PR Description Template
+
+```markdown
+## Description
+Brief description of changes made.
+
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Testing
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+- [ ] Performance impact assessed
+
+## Checklist
+- [ ] Code follows project coding standards
+- [ ] Self-review completed
+- [ ] Documentation updated (if applicable)
+- [ ] Tests added/updated
+- [ ] No breaking changes (or clearly documented)
+
+## Related Issues
+Fixes #123
+Closes #456
+```
+
+## Code Review Process
+
+### What We Look For
+
+1. **Correctness** - Does the code solve the problem correctly?
+2. **Performance** - Is the solution efficient?
+3. **Maintainability** - Is the code clean and readable?
+4. **Testing** - Are there adequate tests?
+5. **Documentation** - Is the code well-documented?
+
+### Review Timeline
+
+- **Initial Review**: Within 2-3 business days
+- **Follow-up Reviews**: Within 1-2 business days
+- **Merge**: After approval and CI passes
+
+## Getting Help
+
+### Communication Channels
+
+- **GitHub Issues** - For bugs and feature requests
+- **GitHub Discussions** - For questions and general discussion
+- **Pull Request Comments** - For code review discussion
+
+### Mentorship
+
+New contributors are welcome! If you're new to open source or need help getting started:
+
+1. Look for issues labeled `good first issue`
+2. Comment on issues you're interested in working on
+3. Don't hesitate to ask questions in GitHub Discussions
+
+## Recognition
+
+Contributors will be:
+
+- **Listed in Contributors** - GitHub automatically tracks contributions
+- **Mentioned in Release Notes** - Significant contributions highlighted
+- **Added to README** - Major contributors recognized in project README
+
+## Code of Conduct
+
+We follow the [Contributor Covenant](https://www.contributor-covenant.org/). In summary:
+
+- **Be Respectful** - Treat everyone with respect and kindness
+- **Be Inclusive** - Welcome people of all backgrounds and experience levels
+- **Be Collaborative** - Work together constructively
+- **Be Professional** - Keep discussions focused and productive
+
+## Questions?
+
+If you have any questions about contributing, please:
+
+1. Check existing [GitHub Discussions](https://github.com/tavobarrientos/TacoMapper/discussions)
+2. Create a new discussion if your question isn't answered
+3. Reach out to maintainers through GitHub
+
+Thank you for contributing to TacoMapper! 🌮✨

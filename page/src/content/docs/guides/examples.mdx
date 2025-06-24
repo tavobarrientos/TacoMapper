@@ -1,0 +1,343 @@
+---
+title: Examples
+description: Real-world examples and use cases for TacoMapper.
+---
+
+## Basic Examples
+
+### Simple Auto-Mapping
+
+```csharp
+public class Person
+{
+    public int Id { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string Email { get; set; }
+}
+
+public class PersonDto
+{
+    public int Id { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string Email { get; set; }
+}
+
+// Auto-mapping with matching properties
+var person = new Person { Id = 1, FirstName = "John", LastName = "Doe", Email = "john@example.com" };
+var personDto = ObjectMapper.Map<Person, PersonDto>(person);
+```
+
+### Custom Property Mapping
+
+```csharp
+public class Employee
+{
+    public int Id { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public DateTime DateOfBirth { get; set; }
+    public decimal Salary { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class EmployeeDto
+{
+    public int Id { get; set; }
+    public string FullName { get; set; }
+    public int Age { get; set; }
+    public string SalaryFormatted { get; set; }
+    public string Status { get; set; }
+}
+
+var mapper = ObjectMapper.Create<Employee, EmployeeDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Age, src => src.DateOfBirth, dob => DateTime.Now.Year - dob.Year)
+    .Map(dest => dest.SalaryFormatted, src => src.Salary, salary => $"${salary:N2}")
+    .Map(dest => dest.Status, src => src.IsActive, active => active ? "Active" : "Inactive")
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+
+var employee = new Employee 
+{ 
+    Id = 1, 
+    FirstName = "Jane", 
+    LastName = "Smith", 
+    DateOfBirth = new DateTime(1985, 3, 15),
+    Salary = 75000m,
+    IsActive = true
+};
+
+var result = mapper.MapFrom(employee);
+// Result: { Id = 1, FullName = "Jane Smith", Age = 39, SalaryFormatted = "$75,000.00", Status = "Active" }
+```
+
+## Advanced Examples
+
+### E-commerce Order Processing
+
+```csharp
+public class Order
+{
+    public int Id { get; set; }
+    public string CustomerName { get; set; }
+    public decimal SubTotal { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal ShippingCost { get; set; }
+    public DateTime OrderDate { get; set; }
+    public OrderStatus Status { get; set; }
+    public string ShippingAddress { get; set; }
+    public string TrackingNumber { get; set; }
+    public DateTime? EstimatedDelivery { get; set; }
+    public bool ExpressShipping { get; set; }
+}
+
+public class OrderSummaryDto
+{
+    public int OrderId { get; set; }
+    public string Customer { get; set; }
+    public string OrderTotal { get; set; }
+    public string OrderDateFormatted { get; set; }
+    public string StatusDisplay { get; set; }
+    public string ShippingInfo { get; set; }
+    public string DeliveryInfo { get; set; }
+}
+
+var orderMapper = ObjectMapper.Create<Order, OrderSummaryDto>()
+    .Map(dest => dest.OrderId, src => src.Id)
+    .Map(dest => dest.Customer, src => src.CustomerName)
+    .Map(dest => dest.OrderDateFormatted, src => src.OrderDate, date => date.ToString("MMM dd, yyyy"))
+    .Map(dest => dest.StatusDisplay, src => src.Status, status => FormatOrderStatus(status))
+    .Combine(dest => dest.OrderTotal, src => $"${(src.SubTotal + src.TaxAmount + src.ShippingCost):N2}")
+    .MapIf(dest => dest.ShippingInfo, 
+           src => src.ShippingAddress, 
+           src => src.Status != OrderStatus.Cancelled)
+    .MapIf(dest => dest.DeliveryInfo, 
+           src => src.EstimatedDelivery, 
+           date => $"Expected: {date.Value:MMM dd}",
+           src => src.EstimatedDelivery.HasValue && src.Status == OrderStatus.Shipped);
+
+static string FormatOrderStatus(OrderStatus status) => status switch
+{
+    OrderStatus.Pending => "⏳ Pending",
+    OrderStatus.Processing => "🔄 Processing",
+    OrderStatus.Shipped => "🚚 Shipped",
+    OrderStatus.Delivered => "✅ Delivered",
+    OrderStatus.Cancelled => "❌ Cancelled",
+    _ => "❓ Unknown"
+};
+```
+
+### User Profile with Security
+
+```csharp
+public class User
+{
+    public int Id { get; set; }
+    public string Username { get; set; }
+    public string Email { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public DateTime LastLogin { get; set; }
+    public decimal? Salary { get; set; }
+    public bool IsAdmin { get; set; }
+    public bool IsActive { get; set; }
+    public string Department { get; set; }
+}
+
+public class UserProfileDto
+{
+    public int Id { get; set; }
+    public string Username { get; set; }
+    public string DisplayName { get; set; }
+    public string Email { get; set; }
+    public string LastLoginFormatted { get; set; }
+    public string SalaryInfo { get; set; }
+    public string Role { get; set; }
+}
+
+// Context for permission-based mapping
+public class MappingContext
+{
+    public User CurrentUser { get; set; }
+    public bool CanViewEmails { get; set; }
+    public bool CanViewSalaries { get; set; }
+}
+
+public static IMapper<User, UserProfileDto> CreateUserMapper(MappingContext context)
+{
+    return ObjectMapper.Create<User, UserProfileDto>()
+        .Map(dest => dest.Id, src => src.Id)
+        .Map(dest => dest.Username, src => src.Username)
+        .Map(dest => dest.Role, src => src.IsAdmin, admin => admin ? "Administrator" : "User")
+        .Combine(dest => dest.DisplayName, src => $"{src.FirstName} {src.LastName}")
+        .MapIf(dest => dest.Email, 
+               src => src.Email, 
+               src => context.CanViewEmails)
+        .MapIf(dest => dest.LastLoginFormatted, 
+               src => src.LastLogin, 
+               login => login.ToString("yyyy-MM-dd HH:mm"),
+               src => context.CurrentUser.IsAdmin)
+        .MapIf(dest => dest.SalaryInfo, 
+               src => src.Salary, 
+               salary => salary.HasValue ? $"${salary.Value:N0}" : "Not disclosed",
+               src => context.CanViewSalaries && src.IsActive);
+}
+
+// Usage
+var context = new MappingContext 
+{ 
+    CurrentUser = currentUser, 
+    CanViewEmails = currentUser.IsAdmin,
+    CanViewSalaries = currentUser.IsAdmin || currentUser.Department == "HR"
+};
+
+var mapper = CreateUserMapper(context);
+var userProfiles = mapper.MapFrom(users);
+```
+
+### Address Normalization
+
+```csharp
+public class RawAddress
+{
+    public string Street1 { get; set; }
+    public string Street2 { get; set; }
+    public string City { get; set; }
+    public string State { get; set; }
+    public string ZipCode { get; set; }
+    public string CountryCode { get; set; }
+    public bool IsPrimary { get; set; }
+    public string AddressType { get; set; } // "Home", "Work", "Billing", etc.
+}
+
+public class NormalizedAddressDto
+{
+    public string FullStreet { get; set; }
+    public string CityState { get; set; }
+    public string PostalCode { get; set; }
+    public string Country { get; set; }
+    public string FormattedAddress { get; set; }
+    public string AddressLabel { get; set; }
+    public bool IsPrimaryAddress { get; set; }
+}
+
+var addressMapper = ObjectMapper.Create<RawAddress, NormalizedAddressDto>()
+    .Map(dest => dest.PostalCode, src => src.ZipCode)
+    .Map(dest => dest.IsPrimaryAddress, src => src.IsPrimary)
+    .Map(dest => dest.Country, src => src.CountryCode, code => GetCountryName(code))
+    .Combine(dest => dest.FullStreet, src => 
+        string.IsNullOrEmpty(src.Street2) 
+            ? src.Street1 
+            : $"{src.Street1}, {src.Street2}")
+    .Combine(dest => dest.CityState, src => $"{src.City}, {src.State}")
+    .Combine(dest => dest.FormattedAddress, src => 
+        $"{(string.IsNullOrEmpty(src.Street2) ? src.Street1 : $"{src.Street1}, {src.Street2}")}\n" +
+        $"{src.City}, {src.State} {src.ZipCode}\n" +
+        $"{GetCountryName(src.CountryCode)}")
+    .MapIf(dest => dest.AddressLabel, 
+           src => src.AddressType, 
+           type => src.IsPrimary ? $"Primary {type}" : type,
+           src => !string.IsNullOrEmpty(src.AddressType));
+
+static string GetCountryName(string countryCode) => countryCode?.ToUpper() switch
+{
+    "US" => "United States",
+    "CA" => "Canada",
+    "MX" => "Mexico",
+    "GB" => "United Kingdom",
+    "DE" => "Germany",
+    "FR" => "France",
+    _ => countryCode ?? "Unknown"
+};
+```
+
+## Collection Processing Examples
+
+### Batch User Processing
+
+```csharp
+var users = GetUsersFromDatabase(); // List<User>
+
+// Create mapper once
+var userMapper = ObjectMapper.Create<User, UserDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Email, src => src.Email)
+    .Map(dest => dest.Status, src => src.IsActive, active => active ? "Active" : "Inactive")
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}")
+    .MapIf(dest => dest.LastLoginFormatted, 
+           src => src.LastLogin, 
+           login => login.ToString("MMM dd, yyyy"),
+           src => src.LastLogin > DateTime.MinValue);
+
+// Use for entire collection
+var userDtos = userMapper.MapFrom(users);
+
+// Filter and process
+var activeUserDtos = userMapper.MapFrom(users.Where(u => u.IsActive));
+```
+
+### Product Catalog Processing
+
+```csharp
+public class Product
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public decimal RegularPrice { get; set; }
+    public decimal? SalePrice { get; set; }
+    public int StockQuantity { get; set; }
+    public bool IsActive { get; set; }
+    public bool ShowInventory { get; set; }
+    public string Category { get; set; }
+}
+
+public class ProductCatalogDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; }
+    public string ShortDescription { get; set; }
+    public string PriceDisplay { get; set; }
+    public string AvailabilityStatus { get; set; }
+    public bool OnSale { get; set; }
+    public string CategoryName { get; set; }
+}
+
+var productMapper = ObjectMapper.Create<Product, ProductCatalogDto>()
+    .Map(dest => dest.ProductId, src => src.Id)
+    .Map(dest => dest.ProductName, src => src.Name)
+    .Map(dest => dest.CategoryName, src => src.Category)
+    .Map(dest => dest.OnSale, src => src.SalePrice, price => price.HasValue)
+    .Map(dest => dest.ShortDescription, src => src.Description, desc => TruncateDescription(desc, 100))
+    .Combine(dest => dest.PriceDisplay, src => 
+        src.SalePrice.HasValue 
+            ? $"${src.SalePrice.Value:N2} (was ${src.RegularPrice:N2})"
+            : $"${src.RegularPrice:N2}")
+    .MapIf(dest => dest.AvailabilityStatus, 
+           src => src.StockQuantity, 
+           stock => GetAvailabilityMessage(stock),
+           src => src.ShowInventory && src.IsActive);
+
+static string TruncateDescription(string description, int maxLength)
+{
+    if (string.IsNullOrEmpty(description) || description.Length <= maxLength)
+        return description;
+    
+    return description[..maxLength] + "...";
+}
+
+static string GetAvailabilityMessage(int stock) => stock switch
+{
+    0 => "Out of Stock",
+    < 5 => "Limited Stock",
+    < 20 => "In Stock",
+    _ => "Available"
+};
+
+// Process products
+var products = GetProductsFromCatalog();
+var catalogItems = productMapper.MapFrom(products.Where(p => p.IsActive));
+```
+
+These examples demonstrate TacoMapper's flexibility in handling real-world scenarios with complex business logic, conditional mapping, and efficient collection processing.

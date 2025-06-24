@@ -1,0 +1,79 @@
+---
+title: TacoMapper
+description: A lightweight C# object mapper with fluent API for efficient data transformation.
+template: splash
+hero:
+  tagline: A very lightweight C# object mapper with a fluent API that supports basic mapping, conditional mapping, and combine mapping.
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: Get Started
+      link: /guides/getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/tavobarrientos/TacoMapper
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+TacoMapper is designed to be readable, small, and efficient with the following features:
+
+<CardGrid>
+	<Card title="🌮 Basic Property Mapping" icon="rocket">
+		Auto-map properties with matching names and types for quick transformations.
+	</Card>
+	<Card title="🌯 Custom Transformations" icon="setting">
+		Transform values during mapping with custom functions and expressions.
+	</Card>
+	<Card title="🥙 Conditional Mapping" icon="approve-check">
+		Map properties based on conditions to handle complex business logic.
+	</Card>
+	<Card title="🌮 Combine Mapping" icon="puzzle">
+		Combine multiple source properties into one destination property.
+	</Card>
+	<Card title="🔥 Fluent API" icon="open-book">
+		Chain mapping configurations for improved readability and maintainability.
+	</Card>
+	<Card title="📦 Collection Support" icon="list-format">
+		Map collections of objects efficiently with the same configuration.
+	</Card>
+	<Card title="🚫 Ignore Properties" icon="cancel">
+		Skip specific properties during mapping when needed.
+	</Card>
+	<Card title="⚡ Lightweight" icon="star">
+		Minimal dependencies and small footprint for better performance.
+	</Card>
+</CardGrid>
+
+## Quick Example
+
+```csharp
+// Simple auto-mapping
+var personDto = ObjectMapper.Map<Person, PersonDto>(person);
+
+// Fluent API with custom mapping
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Age, src => src.DateOfBirth, dob => DateTime.Now.Year - dob.Year)
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+
+var result = mapper.MapFrom(person);
+```
+
+## Why TacoMapper?
+
+- **🚀 Performance** - Compiled expressions for fast execution after initial setup
+- **📖 Readable** - Fluent API makes mapping configurations clear and maintainable
+- **🔧 Flexible** - Supports simple auto-mapping and complex custom scenarios
+- **📏 Lightweight** - Minimal dependencies with small memory footprint
+- **🎯 Focused** - Does one thing well - object mapping with clean API
+
+## Getting Started
+
+Ready to start mapping objects with TacoMapper? Check out our [Getting Started Guide](/guides/getting-started/) for installation instructions and your first mapping examples.
+
+For more advanced scenarios, explore our [comprehensive examples](/guides/examples/) and [API reference](/reference/api-reference/).

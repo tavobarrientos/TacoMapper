@@ -1,0 +1,173 @@
+---
+title: Conditional Mapping
+description: Learn how to use conditional mapping to handle complex business logic scenarios.
+---
+
+## Overview
+
+Conditional mapping allows you to map properties only when certain conditions are met. This is useful for handling business logic, security requirements, or data validation scenarios.
+
+## Basic Conditional Mapping
+
+Map a property only when a condition is true:
+
+```csharp
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.FirstName, src => src.FirstName)
+    .MapIf(dest => dest.Email, 
+           src => src.Email, 
+           src => src.IsActive) // Only map email if person is active
+    .MapIf(dest => dest.Phone, 
+           src => src.Phone, 
+           src => !string.IsNullOrEmpty(src.Phone)); // Only map if phone exists
+```
+
+## Conditional Mapping with Transformations
+
+Combine conditions with custom transformations:
+
+```csharp
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.FirstName, src => src.FirstName)
+    .MapIf(dest => dest.SalaryFormatted, 
+           src => src.Salary, 
+           salary => $"${salary:N2}", 
+           src => src.IsActive && src.ShowSalary) // Format salary only if active and allowed
+    .MapIf(dest => dest.AgeCategory, 
+           src => src.DateOfBirth, 
+           dob => GetAgeCategory(DateTime.Now.Year - dob.Year),
+           src => src.DateOfBirth != default); // Only if DOB is set
+```
+
+## Real-World Examples
+
+### User Permission-Based Mapping
+
+```csharp
+var mapper = ObjectMapper.Create<User, UserDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Username, src => src.Username)
+    .MapIf(dest => dest.Email, 
+           src => src.Email, 
+           src => currentUser.CanViewEmails)
+    .MapIf(dest => dest.LastLoginFormatted, 
+           src => src.LastLogin, 
+           login => login.ToString("yyyy-MM-dd HH:mm"),
+           src => currentUser.IsAdmin)
+    .MapIf(dest => dest.Salary, 
+           src => src.Salary, 
+           src => currentUser.CanViewSalaries && src.IsActive);
+```
+
+### Order Processing Example
+
+```csharp
+var mapper = ObjectMapper.Create<Order, OrderDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.CustomerName, src => src.CustomerName)
+    .MapIf(dest => dest.DiscountAmount, 
+           src => src.DiscountAmount, 
+           src => src.DiscountAmount > 0)
+    .MapIf(dest => dest.ShippingAddress, 
+           src => src.ShippingAddress, 
+           src => src.RequiresShipping)
+    .MapIf(dest => dest.TrackingNumber, 
+           src => src.TrackingNumber, 
+           src => src.Status == OrderStatus.Shipped)
+    .MapIf(dest => dest.EstimatedDelivery, 
+           src => src.EstimatedDelivery, 
+           date => date.ToString("MMM dd, yyyy"),
+           src => src.Status == OrderStatus.Shipped && src.EstimatedDelivery.HasValue);
+```
+
+### Product Catalog Example
+
+```csharp
+var mapper = ObjectMapper.Create<Product, ProductDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Name, src => src.Name)
+    .Map(dest => dest.Description, src => src.Description)
+    .MapIf(dest => dest.SalePrice, 
+           src => src.SalePrice, 
+           src => src.IsOnSale)
+    .MapIf(dest => dest.DiscountPercentage, 
+           src => src.SalePrice, 
+           salePrice => CalculateDiscountPercentage(src.RegularPrice, salePrice),
+           src => src.IsOnSale && src.SalePrice < src.RegularPrice)
+    .MapIf(dest => dest.AvailabilityMessage, 
+           src => src.StockQuantity, 
+           stock => GetAvailabilityMessage(stock),
+           src => src.ShowInventory);
+```
+
+## Complex Condition Logic
+
+You can use complex boolean expressions in conditions:
+
+```csharp
+var mapper = ObjectMapper.Create<Employee, EmployeeDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Name, src => src.Name)
+    .MapIf(dest => dest.Salary, 
+           src => src.Salary, 
+           src => src.IsActive && 
+                  src.Department != "Contractor" && 
+                  (currentUser.IsHR || currentUser.IsManager))
+    .MapIf(dest => dest.PerformanceRating, 
+           src => src.PerformanceRating, 
+           rating => rating.ToString(),
+           src => src.HasPerformanceReview && 
+                  DateTime.Now.Month >= 12 && // After December
+                  src.YearsOfService >= 1);
+```
+
+## Helper Methods
+
+Create reusable condition methods:
+
+```csharp
+public static class MappingConditions
+{
+    public static bool CanViewSensitiveData(User user, Employee employee) =>
+        user.IsAdmin || 
+        (user.IsManager && user.Department == employee.Department) ||
+        user.Id == employee.Id;
+        
+    public static bool IsActiveAndVerified(Person person) =>
+        person.IsActive && person.IsEmailVerified;
+        
+    public static bool HasRecentActivity(User user) =>
+        user.LastActivity > DateTime.Now.AddDays(-30);
+}
+
+// Usage in mapper
+var mapper = ObjectMapper.Create<Employee, EmployeeDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .MapIf(dest => dest.Salary, 
+           src => src.Salary, 
+           src => MappingConditions.CanViewSensitiveData(currentUser, src))
+    .MapIf(dest => dest.Status, 
+           src => src.Status, 
+           src => MappingConditions.IsActiveAndVerified(src));
+```
+
+## Performance Considerations
+
+1. **Simple Conditions**: Keep condition expressions simple for better performance
+2. **Avoid Heavy Operations**: Don't perform expensive operations in condition functions
+3. **Cache Results**: If the same condition is used multiple times, consider caching the result
+4. **Early Exit**: Structure conditions to exit early when possible
+
+```csharp
+// Good: Simple and fast
+src => src.IsActive
+
+// Less optimal: Multiple property access
+src => src.User?.Profile?.Settings?.ShowEmail == true
+
+// Better: Cache the result
+var showEmail = src.User?.Profile?.Settings?.ShowEmail == true;
+mapper.MapIf(dest => dest.Email, src => src.Email, src => showEmail);
+```

@@ -1,0 +1,118 @@
+---
+title: Advanced Mapping
+description: Learn advanced mapping techniques including transformations, combining properties, and ignoring fields.
+---
+
+## Custom Transformations
+
+Transform values during mapping with custom functions:
+
+```csharp
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Age, src => src.DateOfBirth, dob => DateTime.Now.Year - dob.Year)
+    .Map(dest => dest.Status, src => src.IsActive, active => active ? "Active" : "Inactive")
+    .Map(dest => dest.SalaryFormatted, src => src.Salary, salary => $"${salary:N2}");
+```
+
+## Combining Properties
+
+Combine multiple source properties into a single destination property:
+
+```csharp
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}")
+    .Combine(dest => dest.ContactInfo, src => $"{src.Email} | {src.Phone}");
+```
+
+## Ignoring Properties
+
+Skip specific properties during mapping:
+
+```csharp
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.FirstName, src => src.FirstName)
+    .Ignore(dest => dest.Email) // Skip email mapping
+    .Ignore(dest => dest.Salary) // Skip salary mapping
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+```
+
+## Complex Address Example
+
+Here's a comprehensive example showing address mapping with multiple techniques:
+
+```csharp
+var mapper = ObjectMapper.Create<Address, AddressDto>()
+    .Map(dest => dest.Street, src => src.Street)
+    .Map(dest => dest.City, src => src.City)
+    .Map(dest => dest.ZipCode, src => src.ZipCode)
+    .Map(dest => dest.Country, src => src.CountryCode, code => GetCountryName(code))
+    .Combine(dest => dest.FormattedAddress, 
+             src => $"{src.Street}, {src.City} {src.ZipCode}")
+    .Combine(dest => dest.FullAddress, 
+             src => $"{src.Street}, {src.City}, {src.State} {src.ZipCode}, {src.Country}");
+
+// Helper method
+string GetCountryName(string countryCode) => countryCode switch
+{
+    "US" => "United States",
+    "CA" => "Canada",
+    "MX" => "Mexico",
+    _ => "Unknown"
+};
+```
+
+## Mapper Reusability
+
+Mappers are designed to be reused efficiently:
+
+```csharp
+// Create once
+var personMapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+
+// Use many times
+var person1Dto = personMapper.MapFrom(person1);
+var person2Dto = personMapper.MapFrom(person2);
+var peopleDto = personMapper.MapFrom(peopleList);
+```
+
+## Performance Tips
+
+1. **Reuse Mappers**: Create mapper instances once and reuse them
+2. **Explicit Mapping**: Use explicit mapping for hot code paths instead of auto-mapping
+3. **Compiled Expressions**: The first mapping execution compiles expressions, subsequent calls are faster
+4. **Collection Efficiency**: Use the same mapper instance for collection mapping
+
+## Error Handling
+
+TacoMapper will throw exceptions for:
+
+- **Invalid property expressions**
+- **Type mismatches** in transformations
+- **Null reference exceptions** during mapping
+
+Always handle these appropriately in your application:
+
+```csharp
+try 
+{
+    var result = mapper.MapFrom(source);
+    return result;
+}
+catch (ArgumentException ex)
+{
+    // Handle mapping configuration errors
+    logger.LogError(ex, "Mapping configuration error");
+    throw;
+}
+catch (Exception ex)
+{
+    // Handle runtime mapping errors
+    logger.LogError(ex, "Runtime mapping error");
+    throw;
+}
+```
