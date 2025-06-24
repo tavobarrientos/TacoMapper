@@ -18,17 +18,52 @@ jobs:
   check-pr-merged:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
+    outputs:
+      has-code-changes: ${{ steps.changes.outputs.has-code-changes }}
+      should-publish: ${{ steps.changes.outputs.should-publish }}
     steps:
-      - name: PR Merged Check
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for code changes
+        id: changes
         run: |
-          echo "✅ Building and deploying prerelease package"
+          echo "✅ Checking for code changes that require package release"
           echo "Event: ${{ github.event_name }}"
+          
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "PR #${{ github.event.pull_request.number }} was merged"
+            # For merged PRs, compare against the base branch
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          else
+            # For direct pushes, compare with previous commit
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check if any files outside of page/ directory were changed
+          CODE_CHANGES=$(echo "$CHANGED_FILES" | grep -v "^page/" | grep -v "^\.github/workflows/deploy-gh-pages\.yml" || true)
+          
+          if [ -n "$CODE_CHANGES" ]; then
+            echo "✅ Code changes detected outside documentation:"
+            echo "$CODE_CHANGES"
+            echo "has-code-changes=true" >> $GITHUB_OUTPUT
+            echo "should-publish=true" >> $GITHUB_OUTPUT
+            echo "📦 Will publish prerelease package"
+          else
+            echo "📚 Only documentation/page changes detected"
+            echo "has-code-changes=false" >> $GITHUB_OUTPUT
+            echo "should-publish=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Skipping package publishing"
           fi
 
   deploy-prerelease:
     needs: check-pr-merged
+    if: needs.check-pr-merged.outputs.should-publish == 'true'
     uses: ./.github/workflows/base-build-and-test.yml
     with:
       is-prerelease: true
@@ -36,3 +71,20 @@ jobs:
     secrets:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       COVERAGE_THRESHOLD: ${{ secrets.COVERAGE_THRESHOLD }}
+
+  skip-prerelease:
+    needs: check-pr-merged
+    if: needs.check-pr-merged.outputs.should-publish == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip publishing
+        run: |
+          echo "📚 Skipping prerelease package publishing"
+          echo "Only documentation changes detected in page/ directory"
+          echo "No code changes require a new package version"
+          echo ""
+          echo "Changed files were limited to:"
+          echo "- Documentation (page/ directory)"
+          echo "- GitHub Pages deployment workflow"
+          echo ""
+          echo "✅ Workflow completed successfully without publishing"
