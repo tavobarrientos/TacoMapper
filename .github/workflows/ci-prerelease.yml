@@ -3,10 +3,8 @@ name: CI - Prerelease Deploy
 on:
   push:
     branches: [ main ]
-    branches-ignore: [ gh-pages ]
   pull_request:
     branches: [ main ]
-    branches-ignore: [ gh-pages ]
     types: [ closed ]
 
 permissions:
