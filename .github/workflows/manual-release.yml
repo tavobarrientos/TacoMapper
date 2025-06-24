@@ -25,7 +25,32 @@ permissions:
   issues: write
 
 jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.branch-check.outputs.should-run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check if branch is allowed
+        id: branch-check
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Current branch: $BRANCH_NAME"
+          
+          if [ "$BRANCH_NAME" = "gh-pages" ]; then
+            echo "❌ Manual release workflow cannot be run on gh-pages branch"
+            echo "should-run=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ Branch $BRANCH_NAME is allowed for manual releases"
+            echo "should-run=true" >> $GITHUB_OUTPUT
+          fi
+
   generate-version:
+    needs: check-branch
+    if: needs.check-branch.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -131,9 +156,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Recent Changes:" >> $GITHUB_STEP_SUMMARY
           echo "$COMMITS" >> $GITHUB_STEP_SUMMARY
-
   deploy-release-with-version:
-    needs: generate-version
+    needs: [check-branch, generate-version]
+    if: needs.check-branch.outputs.should-run == 'true'
     uses: ./.github/workflows/base-build-and-test.yml
     with:
       is-prerelease: false
@@ -142,9 +167,10 @@ jobs:
     secrets:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       COVERAGE_THRESHOLD: ${{ secrets.COVERAGE_THRESHOLD }}
+      
   create-enhanced-release:
-    needs: [generate-version, deploy-release-with-version]
-    if: success()
+    needs: [check-branch, generate-version, deploy-release-with-version]
+    if: needs.check-branch.outputs.should-run == 'true' && success()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
