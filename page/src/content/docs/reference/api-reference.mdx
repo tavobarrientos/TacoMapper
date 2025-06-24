@@ -1,0 +1,319 @@
+---
+title: API Reference
+description: Complete API reference for TacoMapper including all methods and interfaces.
+---
+
+## ObjectMapper Static Class
+
+The main entry point for creating mappers and performing simple mappings.
+
+### Static Methods
+
+#### Create&lt;TSource, TDestination&gt;()
+
+Creates a new mapper instance for configuring custom mappings.
+
+```csharp
+public static IMapper<TSource, TDestination> Create<TSource, TDestination>()
+```
+
+**Returns:** A new `IMapper<TSource, TDestination>` instance for fluent configuration.
+
+**Example:**
+
+```csharp
+var mapper = ObjectMapper.Create<Person, PersonDto>();
+```
+
+#### Map&lt;TSource, TDestination&gt;(source)
+
+Performs simple auto-mapping for a single object with matching property names and types.
+
+```csharp
+public static TDestination Map<TSource, TDestination>(TSource source)
+```
+
+**Parameters:**
+
+- `source`: The source object to map from
+
+**Returns:** A new instance of `TDestination` with mapped properties.
+
+**Example:**
+
+```csharp
+var personDto = ObjectMapper.Map<Person, PersonDto>(person);
+```
+
+#### Map&lt;TSource, TDestination&gt;(sources)
+
+Performs simple auto-mapping for a collection of objects.
+
+```csharp
+public static List<TDestination> Map<TSource, TDestination>(IEnumerable<TSource> sources)
+```
+
+**Parameters:**
+
+- `sources`: The collection of source objects to map from
+
+**Returns:** A list of `TDestination` objects with mapped properties.
+
+**Example:**
+
+```csharp
+var peopleDtos = ObjectMapper.Map<Person, PersonDto>(people);
+```
+
+## IMapper&lt;TSource, TDestination&gt; Interface
+
+The fluent mapper interface for configuring object mapping.
+
+### Basic Mapping Methods
+
+#### Map&lt;TProp&gt;(destinationProperty, sourceProperty)
+
+Maps a source property to a destination property with the same type.
+
+```csharp
+IMapper<TSource, TDestination> Map<TProp>(
+    Expression<Func<TDestination, TProp>> destinationProperty,
+    Expression<Func<TSource, TProp>> sourceProperty)
+```
+
+**Parameters:**
+
+- `destinationProperty`: Expression selecting the destination property
+- `sourceProperty`: Expression selecting the source property
+
+**Returns:** The mapper instance for method chaining.
+
+**Example:**
+
+```csharp
+mapper.Map(dest => dest.Id, src => src.Id)
+```
+
+#### Map&lt;TSrcProp, TDestProp&gt;(destinationProperty, sourceProperty, transform)
+
+Maps a source property to a destination property with a custom transformation.
+
+```csharp
+IMapper<TSource, TDestination> Map<TSrcProp, TDestProp>(
+    Expression<Func<TDestination, TDestProp>> destinationProperty,
+    Expression<Func<TSource, TSrcProp>> sourceProperty,
+    Func<TSrcProp, TDestProp> transform)
+```
+
+**Parameters:**
+
+- `destinationProperty`: Expression selecting the destination property
+- `sourceProperty`: Expression selecting the source property
+- `transform`: Function to transform the source value
+
+**Returns:** The mapper instance for method chaining.
+
+**Example:**
+
+```csharp
+mapper.Map(dest => dest.Age, src => src.DateOfBirth, dob => DateTime.Now.Year - dob.Year)
+```
+
+### Conditional Mapping Methods
+
+#### MapIf&lt;TProp&gt;(destinationProperty, sourceProperty, condition)
+
+Conditionally maps a property based on a predicate.
+
+```csharp
+IMapper<TSource, TDestination> MapIf<TProp>(
+    Expression<Func<TDestination, TProp>> destinationProperty,
+    Expression<Func<TSource, TProp>> sourceProperty,
+    Func<TSource, bool> condition)
+```
+
+**Parameters:**
+
+- `destinationProperty`: Expression selecting the destination property
+- `sourceProperty`: Expression selecting the source property
+- `condition`: Predicate function that determines if mapping should occur
+
+**Returns:** The mapper instance for method chaining.
+
+**Example:**
+
+```csharp
+mapper.MapIf(dest => dest.Email, src => src.Email, src => src.IsActive)
+```
+
+#### MapIf&lt;TSrcProp, TDestProp&gt;(destinationProperty, sourceProperty, transform, condition)
+
+Conditionally maps a property with transformation based on a predicate.
+
+```csharp
+IMapper<TSource, TDestination> MapIf<TSrcProp, TDestProp>(
+    Expression<Func<TDestination, TDestProp>> destinationProperty,
+    Expression<Func<TSource, TSrcProp>> sourceProperty,
+    Func<TSrcProp, TDestProp> transform,
+    Func<TSource, bool> condition)
+```
+
+**Parameters:**
+
+- `destinationProperty`: Expression selecting the destination property
+- `sourceProperty`: Expression selecting the source property
+- `transform`: Function to transform the source value
+- `condition`: Predicate function that determines if mapping should occur
+
+**Returns:** The mapper instance for method chaining.
+
+**Example:**
+
+```csharp
+mapper.MapIf(dest => dest.SalaryFormatted, 
+             src => src.Salary, 
+             salary => $"${salary:N2}", 
+             src => src.IsActive)
+```
+
+### Combination and Utility Methods
+
+#### Combine&lt;TDestProp&gt;(destinationProperty, combineFunction)
+
+Combines multiple source properties into a single destination property.
+
+```csharp
+IMapper<TSource, TDestination> Combine<TDestProp>(
+    Expression<Func<TDestination, TDestProp>> destinationProperty,
+    Func<TSource, TDestProp> combineFunction)
+```
+
+**Parameters:**
+
+- `destinationProperty`: Expression selecting the destination property
+- `combineFunction`: Function that combines source properties
+
+**Returns:** The mapper instance for method chaining.
+
+**Example:**
+
+```csharp
+mapper.Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}")
+```
+
+#### Ignore&lt;TDestProp&gt;(destinationProperty)
+
+Ignores a destination property during mapping.
+
+```csharp
+IMapper<TSource, TDestination> Ignore<TDestProp>(
+    Expression<Func<TDestination, TDestProp>> destinationProperty)
+```
+
+**Parameters:**
+
+- `destinationProperty`: Expression selecting the destination property to ignore
+
+**Returns:** The mapper instance for method chaining.
+
+**Example:**
+
+```csharp
+mapper.Ignore(dest => dest.Password)
+```
+
+### Execution Methods
+
+#### MapFrom(source)
+
+Executes the mapping configuration on a single source object.
+
+```csharp
+TDestination MapFrom(TSource source)
+```
+
+**Parameters:**
+
+- `source`: The source object to map from
+
+**Returns:** A new instance of `TDestination` with configured mappings applied.
+
+**Example:**
+
+```csharp
+var result = mapper.MapFrom(person);
+```
+
+#### MapFrom(sources)
+
+Executes the mapping configuration on a collection of source objects.
+
+```csharp
+List<TDestination> MapFrom(IEnumerable<TSource> sources)
+```
+
+**Parameters:**
+
+- `sources`: The collection of source objects to map from
+
+**Returns:** A list of `TDestination` objects with configured mappings applied.
+
+**Example:**
+
+```csharp
+var results = mapper.MapFrom(people);
+```
+
+## Type Constraints
+
+- **TSource**: The source object type (must be a reference type with parameterless constructor)
+- **TDestination**: The destination object type (must be a reference type with parameterless constructor)
+- **TProp**: Property type (for same-type mappings)
+- **TSrcProp**: Source property type
+- **TDestProp**: Destination property type
+
+## Exceptions
+
+### ArgumentNullException
+
+Thrown when:
+
+- Source object is null during mapping execution
+- Source collection is null during collection mapping
+
+### ArgumentException
+
+Thrown when:
+
+- Invalid property expressions are provided
+- Property expressions don't represent actual properties
+
+### InvalidOperationException
+
+Thrown when:
+
+- Type conversion fails during transformation
+- Mapper configuration is invalid
+
+### Example Exception Handling
+
+```csharp
+try 
+{
+    var mapper = ObjectMapper.Create<Person, PersonDto>()
+        .Map(dest => dest.Id, src => src.Id)
+        .Map(dest => dest.Name, src => src.FirstName); // This might fail
+        
+    var result = mapper.MapFrom(person);
+}
+catch (ArgumentException ex)
+{
+    // Handle configuration errors
+    Console.WriteLine($"Mapping configuration error: {ex.Message}");
+}
+catch (InvalidOperationException ex)
+{
+    // Handle runtime mapping errors
+    Console.WriteLine($"Runtime mapping error: {ex.Message}");
+}
+```

@@ -1,0 +1,307 @@
+---
+title: Performance Guide
+description: Tips and best practices for optimizing TacoMapper performance.
+---
+
+## Overview
+
+TacoMapper is designed to be lightweight and efficient. This guide covers performance considerations and optimization techniques.
+
+## Performance Characteristics
+
+### Compilation Phase
+
+- **First Use**: Expression trees are compiled on first mapping execution
+- **Subsequent Uses**: Compiled delegates are cached and reused
+- **Memory Usage**: Minimal overhead after compilation
+
+### Runtime Performance
+
+- **Auto-Mapping**: Uses reflection for property discovery
+- **Explicit Mapping**: Uses compiled expressions for property access
+- **Collection Mapping**: Efficient iteration with compiled mappers
+
+## Best Practices
+
+### 1. Reuse Mapper Instances
+
+**❌ Don't do this:**
+
+```csharp
+// Creates new mapper every time
+foreach (var person in people)
+{
+    var mapper = ObjectMapper.Create<Person, PersonDto>()
+        .Map(dest => dest.Id, src => src.Id)
+        .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+    
+    var result = mapper.MapFrom(person);
+}
+```
+
+**✅ Do this instead:**
+
+```csharp
+// Create once, use many times
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+
+// Use for collections
+var results = mapper.MapFrom(people);
+
+// Or use individually
+foreach (var person in people)
+{
+    var result = mapper.MapFrom(person);
+    // Process result...
+}
+```
+
+### 2. Prefer Explicit Mapping for Hot Paths
+
+**For frequently executed code paths:**
+
+```csharp
+// Explicit mapping is faster than auto-mapping
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.FirstName, src => src.FirstName)
+    .Map(dest => dest.LastName, src => src.LastName)
+    .Map(dest => dest.Email, src => src.Email);
+
+// Rather than relying on auto-mapping
+var result = ObjectMapper.Map<Person, PersonDto>(person);
+```
+
+### 3. Optimize Collection Processing
+
+**Use collection mapping:**
+
+```csharp
+// Efficient - single mapper call
+var results = mapper.MapFrom(largeCollection);
+
+// Less efficient - multiple individual calls
+var results = largeCollection.Select(item => mapper.MapFrom(item)).ToList();
+```
+
+### 4. Keep Transformations Simple
+
+**❌ Avoid expensive operations in transformations:**
+
+```csharp
+.Map(dest => dest.ProcessedData, src => src.RawData, data => 
+    ExpensiveExternalApiCall(data)) // Don't do this
+```
+
+**✅ Pre-process or cache expensive operations:**
+
+```csharp
+// Pre-process expensive operations
+var processedData = await ProcessDataBatch(items.Select(i => i.RawData));
+var lookup = processedData.ToDictionary(d => d.Id, d => d.Result);
+
+var mapper = ObjectMapper.Create<Item, ItemDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.ProcessedData, src => src.Id, id => lookup[id]);
+```
+
+### 5. Use Static Mappers for Global Configuration
+
+```csharp
+public static class Mappers
+{
+    public static readonly IMapper<Person, PersonDto> PersonMapper = 
+        ObjectMapper.Create<Person, PersonDto>()
+            .Map(dest => dest.Id, src => src.Id)
+            .Map(dest => dest.Email, src => src.Email)
+            .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+    
+    public static readonly IMapper<Order, OrderDto> OrderMapper = 
+        ObjectMapper.Create<Order, OrderDto>()
+            .Map(dest => dest.Id, src => src.Id)
+            .Map(dest => dest.CustomerName, src => src.CustomerName)
+            .Combine(dest => dest.Total, src => src.SubTotal + src.Tax + src.Shipping);
+}
+
+// Usage
+var personDtos = Mappers.PersonMapper.MapFrom(people);
+var orderDtos = Mappers.OrderMapper.MapFrom(orders);
+```
+
+## Benchmarking
+
+### Simple Mapping Performance
+
+```csharp
+// Example performance test setup
+[Benchmark]
+public PersonDto AutoMapping()
+{
+    return ObjectMapper.Map<Person, PersonDto>(person);
+}
+
+[Benchmark]
+public PersonDto ExplicitMapping()
+{
+    return explicitMapper.MapFrom(person);
+}
+
+[Benchmark]
+public List<PersonDto> CollectionMapping()
+{
+    return mapper.MapFrom(people);
+}
+```
+
+### Expected Performance Characteristics
+
+- **Auto-mapping**: ~2-5x slower than explicit mapping
+- **Explicit mapping**: ~1.5-3x slower than manual property assignment
+- **Collection mapping**: Linear scaling with collection size
+- **Memory allocation**: Minimal after initial compilation
+
+## Memory Optimization
+
+### 1. Avoid Capturing Large Objects
+
+**❌ Don't capture large contexts:**
+
+```csharp
+var largeContext = GetLargeContext();
+
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.ProcessedField, src => src.RawField, 
+         field => largeContext.Process(field)); // Captures entire context
+```
+
+**✅ Extract only what you need:**
+
+```csharp
+var processor = GetLargeContext().Processor; // Extract only needed part
+
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.ProcessedField, src => src.RawField, 
+         field => processor.Process(field));
+```
+
+### 2. Use Value Types for Small Data
+
+```csharp
+// Efficient for small, immutable data
+public readonly struct Point
+{
+    public int X { get; }
+    public int Y { get; }
+    
+    public Point(int x, int y) => (X, Y) = (x, y);
+}
+
+public readonly struct PointDto
+{
+    public int X { get; }
+    public int Y { get; }
+    public string Formatted { get; }
+    
+    public PointDto(int x, int y, string formatted) => (X, Y, Formatted) = (x, y, formatted);
+}
+```
+
+## Monitoring and Profiling
+
+### Performance Monitoring
+
+```csharp
+public class MappingPerformanceMonitor
+{
+    private readonly Dictionary<string, long> _mappingTimes = new();
+    
+    public TDestination MapWithTiming<TSource, TDestination>(
+        IMapper<TSource, TDestination> mapper, 
+        TSource source,
+        string operationName)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var result = mapper.MapFrom(source);
+        stopwatch.Stop();
+        
+        _mappingTimes[operationName] = stopwatch.ElapsedMilliseconds;
+        return result;
+    }
+    
+    public void LogPerformanceStats()
+    {
+        foreach (var (operation, time) in _mappingTimes)
+        {
+            Console.WriteLine($"{operation}: {time}ms");
+        }
+    }
+}
+```
+
+### Memory Profiling
+
+```csharp
+public static class MappingProfiler
+{
+    public static void ProfileMapping<TSource, TDestination>(
+        IMapper<TSource, TDestination> mapper, 
+        IEnumerable<TSource> sources)
+    {
+        var initialMemory = GC.GetTotalMemory(true);
+        
+        var results = mapper.MapFrom(sources);
+        
+        var finalMemory = GC.GetTotalMemory(false);
+        var memoryUsed = finalMemory - initialMemory;
+        
+        Console.WriteLine($"Memory used: {memoryUsed:N0} bytes");
+        Console.WriteLine($"Items processed: {results.Count:N0}");
+        Console.WriteLine($"Memory per item: {(double)memoryUsed / results.Count:F2} bytes");
+    }
+}
+```
+
+## Performance Troubleshooting
+
+### Common Performance Issues
+
+1. **Creating mappers in loops** - Extract mapper creation outside loops
+2. **Complex transformations** - Pre-compute expensive operations
+3. **Large object capture** - Extract only needed data from contexts
+4. **Unnecessary auto-mapping** - Use explicit mapping for critical paths
+
+### Diagnostic Tools
+
+```csharp
+public static class MappingDiagnostics
+{
+    public static void AnalyzeMapper<TSource, TDestination>(
+        IMapper<TSource, TDestination> mapper)
+    {
+        // Warm up the mapper
+        var sample = Activator.CreateInstance<TSource>();
+        mapper.MapFrom(sample);
+        
+        // Time multiple executions
+        var times = new List<long>();
+        var stopwatch = new Stopwatch();
+        
+        for (int i = 0; i < 1000; i++)
+        {
+            stopwatch.Restart();
+            mapper.MapFrom(sample);
+            stopwatch.Stop();
+            times.Add(stopwatch.ElapsedTicks);
+        }
+        
+        Console.WriteLine($"Average: {times.Average():F2} ticks");
+        Console.WriteLine($"Min: {times.Min()} ticks");
+        Console.WriteLine($"Max: {times.Max()} ticks");
+        Console.WriteLine($"Median: {times.OrderBy(t => t).Skip(500).First()} ticks");
+    }
+}
+```
+
+Following these performance guidelines will help you get the most out of TacoMapper in production applications.

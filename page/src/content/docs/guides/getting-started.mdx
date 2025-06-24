@@ -1,0 +1,84 @@
+---
+title: Getting Started
+description: Learn how to install and use TacoMapper in your C# projects.
+---
+
+## Installation
+
+TacoMapper can be installed via NuGet Package Manager or by adding a project reference.
+
+### Via NuGet
+
+```bash
+dotnet add package TacoMapper
+```
+
+### Via Project Reference
+
+If you're building from source or using the library locally:
+
+```bash
+dotnet add reference path/to/lib/TacoMapper.csproj
+```
+
+## Basic Usage
+
+### Simple Auto-Mapping
+
+The simplest way to use TacoMapper is with auto-mapping for objects with matching property names and types:
+
+```csharp
+using TacoMapper.Core;
+
+// Assuming Person and PersonDto have matching properties
+var person = new Person 
+{ 
+    Id = 1, 
+    FirstName = "John", 
+    LastName = "Doe" 
+};
+
+var personDto = ObjectMapper.Map<Person, PersonDto>(person);
+```
+
+### Fluent API Configuration
+
+For more control over the mapping process, use the fluent API:
+
+```csharp
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Map(dest => dest.Email, src => src.Email)
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+
+var result = mapper.MapFrom(person);
+```
+
+## Working with Collections
+
+TacoMapper supports mapping collections efficiently:
+
+```csharp
+var people = new List<Person> { /* your data */ };
+
+// Using a configured mapper
+var mapper = ObjectMapper.Create<Person, PersonDto>()
+    .Map(dest => dest.Id, src => src.Id)
+    .Combine(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
+
+var results = mapper.MapFrom(people);
+
+// Or simple auto-mapping for collections
+var simpleResults = ObjectMapper.Map<Person, PersonDto>(people);
+```
+
+## Requirements
+
+- **.NET 8.0** or later
+- **C# 12.0** language features
+
+## Next Steps
+
+- Learn about [advanced mapping techniques](/guides/advanced-mapping/)
+- Explore [conditional mapping](/guides/conditional-mapping/)
+- Check the [API reference](/reference/api-reference/)
