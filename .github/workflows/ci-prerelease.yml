@@ -45,8 +45,8 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
           
-          # Check if any files outside of page/ directory were changed
-          CODE_CHANGES=$(echo "$CHANGED_FILES" | grep -v "^page/" | grep -v "^\.github/workflows/deploy-gh-pages\.yml" || true)
+          # Check if any files outside of page/ and example/ directories were changed
+          CODE_CHANGES=$(echo "$CHANGED_FILES" | grep -v "^page/" | grep -v "^example/" | grep -v "^\.github/workflows/deploy-gh-pages\.yml" || true)
           
           if [ -n "$CODE_CHANGES" ]; then
             echo "✅ Code changes detected outside documentation:"
@@ -55,7 +55,7 @@ jobs:
             echo "should-publish=true" >> $GITHUB_OUTPUT
             echo "📦 Will publish prerelease package"
           else
-            echo "📚 Only documentation/page changes detected"
+            echo "📚 Only documentation/example changes detected"
             echo "has-code-changes=false" >> $GITHUB_OUTPUT
             echo "should-publish=false" >> $GITHUB_OUTPUT
             echo "⏭️  Skipping package publishing"
@@ -80,11 +80,12 @@ jobs:
       - name: Skip publishing
         run: |
           echo "📚 Skipping prerelease package publishing"
-          echo "Only documentation changes detected in page/ directory"
+          echo "Only documentation/example changes detected"
           echo "No code changes require a new package version"
           echo ""
           echo "Changed files were limited to:"
           echo "- Documentation (page/ directory)"
+          echo "- Example project (example/ directory)"
           echo "- GitHub Pages deployment workflow"
           echo ""
           echo "✅ Workflow completed successfully without publishing"
