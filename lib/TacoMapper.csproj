@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>TacoMapper</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>Gustavo Barrientos</Authors>
     <Company>TacoMapper</Company>
     <Product>TacoMapper</Product>

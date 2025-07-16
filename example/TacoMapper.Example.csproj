@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="TacoMapper" Version="1.0.0-pre5-20250623214635" />
+    <PackageReference Include="TacoMapper" Version="1.0.1" />
   </ItemGroup>
 
 </Project>
